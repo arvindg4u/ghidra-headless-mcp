@@ -211,3 +211,6 @@ __marimo__/
 #  paths (e.g. from compiling tests/fixtures/hello.c); never commit them.
 .DS_Store
 *.dSYM/
+
+# Local pip --target install (persistent deps)
+deps/

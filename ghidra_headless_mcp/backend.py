@@ -30,6 +30,13 @@ class GhidraBackendError(RuntimeError):
     """Raised when a backend operation fails."""
 
 
+def _env_default_read_only() -> bool:
+    """Session read-only default, overridable via GHIDRA_HEADLESS_MCP_READ_ONLY
+    (0/false/no = read-write). Lets the Codex MCP config force read-write."""
+    value = os.environ.get("GHIDRA_HEADLESS_MCP_READ_ONLY", "1").strip().lower()
+    return value not in {"0", "false", "no", "off"}
+
+
 @dataclass
 class SessionRecord:
     """Tracks an open Ghidra program session."""
@@ -118,7 +125,7 @@ class GhidraBackend:
         path: str,
         *,
         update_analysis: bool = True,
-        read_only: bool = True,
+        read_only: bool | None = None,
         project_location: str | None = None,
         project_name: str | None = None,
         program_name: str | None = None,
@@ -150,6 +157,8 @@ class GhidraBackend:
         )
         self._finalize_open_program(program, project)
 
+        if read_only is None:
+            read_only = _env_default_read_only()
         session_id = self._register_session(
             project=project,
             program=program,
@@ -174,7 +183,7 @@ class GhidraBackend:
         *,
         filename: str = "session.bin",
         update_analysis: bool = True,
-        read_only: bool = True,
+        read_only: bool | None = None,
         project_location: str | None = None,
         project_name: str | None = None,
         program_name: str | None = None,
@@ -234,6 +243,8 @@ class GhidraBackend:
             fallback_record.source_path = None
             return opened
 
+        if read_only is None:
+            read_only = _env_default_read_only()
         session_id = self._register_session(
             project=project,
             program=program,
@@ -262,7 +273,7 @@ class GhidraBackend:
         program_path: str | None = None,
         folder_path: str = "/",
         program_name: str | None = None,
-        read_only: bool = True,
+        read_only: bool | None = None,
         update_analysis: bool = False,
     ) -> dict[str, Any]:
         self._ensure_started()
@@ -293,6 +304,8 @@ class GhidraBackend:
             raise GhidraBackendError("failed to open program from project: no Program returned")
         self._finalize_open_program(program, project)
 
+        if read_only is None:
+            read_only = _env_default_read_only()
         session_id = self._register_session(
             project=project,
             program=program,

@@ -17,6 +17,41 @@ _ADDRESS_SCHEMA: dict[str, Any] = {
     "oneOf": [{"type": "integer"}, {"type": "string"}],
 }
 
+# Parameters that are integer-valued in every tool, but should also accept
+# hex/decimal strings (e.g. "0x200") from MCP clients.
+_INT_COERCED_PARAMS: frozenset[str] = frozenset(
+    {
+        "length",
+        "count",
+        "byte_length",
+        "size",
+        "bit_size",
+        "bit_offset",
+        "byte_offset",
+        "byte_width",
+        "operand_index",
+        "ordinal",
+        "line_number",
+        "offset",
+        "limit",
+        "max_depth",
+        "timeout_secs",
+    }
+)
+
+
+def _coerce_int_param(name: str, value: Any) -> Any:
+    if name in _INT_COERCED_PARAMS and isinstance(value, str):
+        text = value.strip()
+        try:
+            return int(text, 0)
+        except ValueError as exc:
+            raise GhidraBackendError(
+                f"invalid value for '{name}': {value!r} "
+                "(expected an integer like 512 or a hex string like 0x200)"
+            ) from exc
+    return value
+
 _SERVER_TOOL_SPECS: tuple[dict[str, Any], ...] = (
     {
         "name": "health.ping",
@@ -494,6 +529,8 @@ def _tool_description(tool_name: str) -> str:
 def _tool_property_schema(param_name: str, param: inspect.Parameter) -> dict[str, Any]:
     if param_name in _ADDRESS_PARAM_NAMES:
         return dict(_ADDRESS_SCHEMA)
+    if param_name in _INT_COERCED_PARAMS:
+        return dict(_ADDRESS_SCHEMA)
     annotation = "" if param.annotation is inspect._empty else str(param.annotation)
     default = param.default
     if param_name == "args":
@@ -964,8 +1001,11 @@ class SimpleMcpServer:
         signature = inspect.signature(backend_method)
 
         def handler(arguments: dict[str, Any]) -> dict[str, Any]:
+            normalized = {
+                name: _coerce_int_param(name, value) for name, value in arguments.items()
+            }
             try:
-                bound = signature.bind(**arguments)
+                bound = signature.bind(**normalized)
             except TypeError as exc:
                 raise GhidraBackendError(str(exc)) from exc
             return backend_method(*bound.args, **bound.kwargs)

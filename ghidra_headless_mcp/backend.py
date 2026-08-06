@@ -2074,12 +2074,15 @@ class GhidraBackend:
         struct_path: str | None = None,
         struct_name: str | None = None,
         old_name: str | None = None,
+        field_name: str | None = None,
         new_name: str,
         offset: int | None = None,
         ordinal: int | None = None,
     ) -> dict[str, Any]:
         if not new_name:
             raise GhidraBackendError("new_name is required")
+        if old_name is None and field_name is not None:
+            old_name = field_name
         struct = self._resolve_data_type(session_id, path=struct_path, name=struct_name)
         if not hasattr(struct, "getComponents"):
             raise GhidraBackendError("target type is not a structure")
@@ -2221,6 +2224,18 @@ class GhidraBackend:
         mnemonic, _, operands = text.partition(" ")
         normalized = mnemonic.upper()
         inverse = {
+            "IF_EQZ": "IF_NEZ",
+            "IF_NEZ": "IF_EQZ",
+            "IF_LTZ": "IF_GEZ",
+            "IF_GEZ": "IF_LTZ",
+            "IF_GTZ": "IF_LEZ",
+            "IF_LEZ": "IF_GTZ",
+            "IF_EQ": "IF_NE",
+            "IF_NE": "IF_EQ",
+            "IF_LT": "IF_GE",
+            "IF_GE": "IF_LT",
+            "IF_GT": "IF_LE",
+            "IF_LE": "IF_GT",
             "JE": "JNE",
             "JZ": "JNZ",
             "JNE": "JE",
